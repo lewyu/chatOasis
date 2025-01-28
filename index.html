@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="DeepSeek 智能对话界面">
+    <title>chatOasis 智能对话</title>
+    <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.5.0/highlight.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #6d8eff;
+            --surface-color: #ffffff;
+            --background-gradient: linear-gradient(135deg, #f5f7ff 0%, #f0f4ff 100%);
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
+            --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
+            --shadow-lg: 0 8px 24px rgba(109, 142, 255, 0.15);
+            --radius-sm: 4px;
+            --radius-md: 8px;
+            --radius-lg: 16px;
+            --spacing-xs: 8px;
+            --spacing-sm: 12px;
+            --spacing-md: 16px;
+            --spacing-lg: 24px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            display: grid;
+            grid-template-rows: auto 1fr auto;
+            min-height: 100vh;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: var(--spacing-lg);
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.5;
+            background: var(--background-gradient);
+            color: #1a1a1a;
+        }
+
+        .app-header {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+            margin-block: var(--spacing-lg);
+            color: var(--primary-color);
+        }
+
+        .chat-container {
+            background: var(--surface-color);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-md);
+            padding: var(--spacing-md);
+            margin-block-end: var(--spacing-lg);
+            overflow-y: auto;
+            scroll-behavior: smooth;
+        }
+
+        .chat-container::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .chat-container::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        .chat-container::-webkit-scrollbar-thumb {
+            background: var(--primary-color);
+            border-radius: 4px;
+        }
+
+        .message {
+            --bubble-bg: var(--surface-color);
+            --bubble-border: transparent;
+
+            display: grid;
+            gap: var(--spacing-xs);
+            max-width: min(90%, 720px);
+            margin: var(--spacing-sm) 0;
+            padding: var(--spacing-sm) var(--spacing-md);
+            background: var(--bubble-bg);
+            border: 1px solid var(--bubble-border);
+            border-radius: var(--radius-md);
+            animation: floatIn 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+            position: relative;
+        }
+
+        .user-message {
+            --bubble-bg: #fff;
+            --bubble-border: rgba(109, 142, 255, 0.15);
+            justify-self: end;
+            border-end-end-radius: var(--radius-sm);
+        }
+
+        .bot-message {
+            --bubble-bg: #f8f9ff;
+            --bubble-border: rgba(0, 0, 0, 0.05);
+            justify-self: start;
+            border-end-start-radius: var(--radius-sm);
+        }
+
+        .message-tools {
+            position: absolute;
+            top: 8px;
+            right: 12px;
+            display: flex;
+            gap: 6px;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .message:hover .message-tools {
+            opacity: 1;
+        }
+
+        .message-tool {
+            width: 24px;
+            height: 24px;
+            border: none;
+            background: rgba(0, 0, 0, 0.06);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            display: grid;
+            place-items: center;
+            transition: all 0.2s ease;
+        }
+
+        .message-tool:hover {
+            background: rgba(109, 142, 255, 0.15);
+        }
+
+        .message-tool i {
+            font-size: 12px;
+            color: var(--primary-color);
+        }
+
+        .edit-mode {
+            background: #fff !important;
+            box-shadow: 0 0 0 2px var(--primary-color) !important;
+        }
+
+        .editor-container {
+            display: none;
+            margin-top: var(--spacing-xs);
+        }
+
+        .editor-container.active {
+            display: block;
+        }
+
+        .edit-input {
+            width: 100%;
+            padding: var(--spacing-xs);
+            border: 1px solid #e4e7ed;
+            border-radius: var(--radius-sm);
+            resize: vertical;
+        }
+
+        .edit-actions {
+            display: flex;
+            gap: var(--spacing-xs);
+            margin-top: var(--spacing-xs);
+        }
+
+        .toast {
+            position: fixed;
+            bottom: var(--spacing-lg);
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: var(--spacing-xs) var(--spacing-md);
+            border-radius: var(--radius-md);
+            font-size: 14px;
+            animation: slideUp 0.3s ease;
+        }
+
+        .input-container {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: var(--spacing-md);
+            background: var(--surface-color);
+            padding: var(--spacing-md);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-md);
+            transition: box-shadow 0.2s ease;
+        }
+
+        .input-container:focus-within {
+            box-shadow: var(--shadow-lg);
+        }
+
+        .chat-input {
+            width: 100%;
+            padding: var(--spacing-sm);
+            border: 1px solid #e4e7ed;
+            border-radius: var(--radius-md);
+            resize: none;
+            min-height: 48px;
+            max-height: 120px;
+            transition: border-color 0.2s ease;
+        }
+
+        .send-button {
+            padding: 0 var(--spacing-lg);
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: transform 0.1s ease;
+        }
+
+        @keyframes floatIn {
+            from { opacity: 0; transform: translateY(20px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        @keyframes slideUp {
+            from { transform: translate(-50%, 20px); opacity: 0; }
+            to { transform: translate(-50%, 0); opacity: 1; }
+        }
+
+        @media (max-width: 640px) {
+            body {
+                padding: var(--spacing-md);
+            }
+            .message {
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+<header class="app-header">
+    <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor" aria-hidden="true">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/>
+    </svg>
+    <h1>chatOasis 智能助手</h1>
+</header>
+
+<main class="chat-container" role="log" aria-live="polite"></main>
+
+<form class="input-container" id="chatForm">
+        <textarea
+                class="chat-input"
+                id="userInput"
+                placeholder="输入消息，Shift+Enter换行..."
+                aria-label="输入消息"
+                rows="1"
+        ></textarea>
+    <button
+            type="submit"
+            class="send-button"
+            id="sendButton"
+            aria-label="发送消息"
+    >
+        <i class="fas fa-paper-plane" aria-hidden="true"></i>
+    </button>
+</form>
+
+<script>
+    (() => {
+        const CONFIG = {
+            API_ENDPOINT: 'http://localhost:5000/chat',
+            MAX_HISTORY: 10,
+            DEBOUNCE_DELAY: 300
+        };
+
+        const state = {
+            isGenerating: false,
+            chatHistory: [],
+            messageCounter: 0,
+            abortController: null
+        };
+
+        const elements = {
+            chatContainer: document.querySelector('.chat-container'),
+            userInput: document.getElementById('userInput'),
+            sendButton: document.getElementById('sendButton'),
+            chatForm: document.getElementById('chatForm')
+        };
+
+        marked.setOptions({
+            breaks: true,
+            highlight: code => hljs.highlightAuto(code).value,
+            sanitizer: cleanedHTML => cleanedHTML
+        });
+
+        class MessageManager {
+            static createMessageElement(role, content, id) {
+                const messageDiv = document.createElement('article');
+                messageDiv.className = `message ${role}-message`;
+                messageDiv.dataset.messageId = id;
+                messageDiv.innerHTML = `
+                    <div class="message-tools" aria-label="消息操作">
+                        <button class="message-tool copy-btn"
+                                aria-label="复制内容"
+                                title="复制内容">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                        ${role === 'user' ? `
+                        <button class="message-tool edit-btn"
+                                aria-label="编辑消息"
+                                title="编辑消息">
+                            <i class="fas fa-edit"></i>
+                        </button>` : ''}
+                    </div>
+                    <div class="message-content">${marked.parse(content)}</div>
+                    <div class="editor-container">
+                        <textarea class="edit-input" rows="3"></textarea>
+                        <div class="edit-actions">
+                            <button type="button" class="save-edit">保存</button>
+                            <button type="button" class="cancel-edit">取消</button>
+                        </div>
+                    </div>
+                `;
+                messageDiv.querySelector('.message-content').dataset.rawText = content;
+                return messageDiv;
+            }
+
+            static appendMessage(role, content, id) {
+                const messageDiv = this.createMessageElement(role, content, id);
+                elements.chatContainer.appendChild(messageDiv);
+                this.bindMessageEvents(messageDiv);
+                messageDiv.scrollIntoView({ behavior: 'smooth' });
+                return messageDiv;
+            }
+
+            static bindMessageEvents(messageElement) {
+                // 复制功能
+                messageElement.querySelector('.copy-btn').addEventListener('click', () => {
+                    const content = messageElement.querySelector('.message-content').textContent;
+                    navigator.clipboard.writeText(content).then(() => {
+                        showToast('内容已复制');
+                    });
+                });
+
+                // 用户消息编辑功能
+                const editBtn = messageElement.querySelector('.edit-btn');
+                if (editBtn) {
+                    editBtn.addEventListener('click', () => this.enterEditMode(messageElement));
+                }
+            }
+
+            static enterEditMode(messageElement) {
+                const contentElement = messageElement.querySelector('.message-content');
+                const editorContainer = messageElement.querySelector('.editor-container');
+                const editInput = messageElement.querySelector('.edit-input');
+
+                messageElement.classList.add('edit-mode');
+                editorContainer.classList.add('active');
+                editInput.value = contentElement.dataset.rawText;
+
+                const saveHandler = () => {
+                    const newContent = editInput.value.trim();
+                    if (newContent) {
+                        contentElement.innerHTML = marked.parse(newContent);
+                        contentElement.dataset.rawText = newContent;
+                        this.updateMessageInHistory(
+                            messageElement.dataset.messageId,
+                            newContent
+                        );
+                    }
+                    this.exitEditMode(messageElement);
+                };
+
+                const cancelHandler = () => this.exitEditMode(messageElement);
+
+                messageElement.querySelector('.save-edit').addEventListener('click', saveHandler);
+                messageElement.querySelector('.cancel-edit').addEventListener('click', cancelHandler);
+
+                messageElement._editHandlers = { saveHandler, cancelHandler };
+            }
+
+            static exitEditMode(messageElement) {
+                messageElement.classList.remove('edit-mode');
+                messageElement.querySelector('.editor-container').classList.remove('active');
+
+                const { saveHandler, cancelHandler } = messageElement._editHandlers;
+                messageElement.querySelector('.save-edit').removeEventListener('click', saveHandler);
+                messageElement.querySelector('.cancel-edit').removeEventListener('click', cancelHandler);
+                delete messageElement._editHandlers;
+            }
+
+            static updateMessageInHistory(messageId, newContent) {
+                const index = state.chatHistory.findIndex(msg => msg.id === messageId);
+                if (index !== -1) {
+                    state.chatHistory[index].content = newContent;
+                }
+            }
+        }
+
+        async function fetchChatResponse(messages) {
+            state.abortController = new AbortController();
+            try {
+                const response = await fetch(CONFIG.API_ENDPOINT, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ messages }),
+                    signal: state.abortController.signal
+                });
+                if (!response.ok) throw new Error(`请求失败: ${response.status}`);
+                return await response.json();
+            } finally {
+                state.abortController = null;
+            }
+        }
+
+        async function handleSubmit(event) {
+            event.preventDefault();
+            if (state.isGenerating || !elements.userInput.value.trim()) return;
+
+            const message = elements.userInput.value.trim();
+            elements.userInput.value = '';
+            state.isGenerating = true;
+            elements.sendButton.disabled = true;
+
+            const messageId = `msg_${Date.now()}_${state.messageCounter++}`;
+            MessageManager.appendMessage('user', message, messageId);
+            state.chatHistory.push({ id: messageId, role: 'user', content: message });
+
+            const loader = document.createElement('div');
+            loader.className = 'message bot-message loading';
+            loader.innerHTML = `<div class="loading-dots"><span></span><span></span><span></span></div>`;
+            elements.chatContainer.appendChild(loader);
+
+            try {
+                const response = await fetchChatResponse(
+                    state.chatHistory.slice(-CONFIG.MAX_HISTORY)
+                );
+
+                if (response.content) {
+                    const botMessageId = `msg_${Date.now()}_${state.messageCounter++}`;
+                    MessageManager.appendMessage('bot', response.content, botMessageId);
+                    state.chatHistory.push({
+                        id: botMessageId,
+                        role: 'assistant',
+                        content: response.content
+                    });
+                }
+            } catch (error) {
+                if (error.name !== 'AbortError') {
+                    MessageManager.appendMessage('bot', `**请求出错**: ${error.message}`);
+                }
+            } finally {
+                loader.remove();
+                state.isGenerating = false;
+                elements.sendButton.disabled = false;
+                elements.userInput.focus();
+            }
+        }
+
+        function handleInput(e) {
+            e.target.style.height = 'auto';
+            e.target.style.height = `${e.target.scrollHeight}px`;
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSubmit(e);
+            }
+        }
+
+        function showToast(text, duration = 2000) {
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = text;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), duration);
+        }
+
+        function debounce(fn, delay) {
+            let timeoutId;
+            return (...args) => {
+                clearTimeout(timeoutId);
+                timeoutId = setTimeout(() => fn.apply(this, args), delay);
+            };
+        }
+
+        function init() {
+            elements.chatForm.addEventListener('submit', handleSubmit);
+            elements.userInput.addEventListener('keydown', handleInput);
+            elements.userInput.addEventListener('input',
+                debounce(() => {
+                    elements.userInput.style.height = 'auto';
+                    elements.userInput.style.height = `${elements.userInput.scrollHeight}px`;
+                }, CONFIG.DEBOUNCE_DELAY)
+            );
+        }
+
+        init();
+    })();
+</script>
+</body>
+</html>
